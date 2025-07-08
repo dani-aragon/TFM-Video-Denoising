@@ -3,9 +3,8 @@ import glob
 import re
 from PIL import Image
 
-import numpy as np
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 import torchvision.transforms as T
 
 import metadata as md

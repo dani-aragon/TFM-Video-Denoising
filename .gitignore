@@ -1,5 +1,5 @@
 # Ignore data folder.
-PVDD/
+data/
 
 # Ignore pycache
 *.pyc
