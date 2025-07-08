@@ -144,7 +144,7 @@ def train(
 
 if __name__ == "__main__":
     # Create dataset.
-    dataset = PVDDTrainDataset(md.PATH_TRAIN)
+    dataset = PVDDTrainDataset(md.PATH_TRAIN, conf.CLIP_LEN)
     print(f"Total clips: {len(dataset)}.")
 
     # Create loader.

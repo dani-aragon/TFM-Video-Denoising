@@ -16,7 +16,7 @@ class PVDDTrainDataset(Dataset):
     por cada bloque de 30 frames, cargando bajo demanda.
     """
     def __init__(
-        self, root_dir: str, clip_len: int =md.CLIP_LEN, transform=None
+        self, root_dir: str, clip_len: int, transform=None
     ):
         self.clip_len  = clip_len
         self.transform = transform or T.ToTensor()
@@ -94,7 +94,7 @@ class PVDDTestDataset(Dataset):
     - empareja noisy_<base>_[SML].png <-> clean_<base>_[SML].png
     """
     def __init__(
-        self, root_dir, level, clip_len=md.CLIP_LEN, transform=None
+        self, root_dir, level, clip_len, transform=None
     ):
         assert level in ('S','M','L')
         self.clip_len = clip_len
