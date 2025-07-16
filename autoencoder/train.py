@@ -9,7 +9,8 @@ from torch import device
 from tqdm.auto import tqdm
 
 # To import local modules.
-# sys.path.insert(0, "D://Documentos//TFM//TFM-Video-Diffusion")
+current_dir = os.path.abspath(os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(current_dir))
 
 import metadata as md
 import config as conf

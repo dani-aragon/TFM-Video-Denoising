@@ -4,7 +4,10 @@ import torch
 
 
 # Root.
-ROOT = os.getenv("ROOT_TFM", "D://Documentos//TFM//TFM-Video-Diffusion//data")
+ROOT = os.getenv(
+    "ROOT_TFM",
+    os.path.join(os.path.abspath(os.path.dirname(__file__)), "data")
+)
 
 # Device.
 DEVICE = torch.device("cuda")

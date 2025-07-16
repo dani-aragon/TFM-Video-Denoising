@@ -1,10 +1,11 @@
-import sys
+import os, sys
 
 import torch.optim as optim
 # from torch.optim.lr_scheduler import CosineAnnealingLR
 
 # To import local modules.
-# sys.path.insert(0, "D://Documentos//TFM//TFM-Video-Diffusion")
+current_dir = os.path.abspath(os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(current_dir))
 
 from autoencoder.arch import *
 
