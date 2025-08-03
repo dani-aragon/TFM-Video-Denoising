@@ -78,11 +78,7 @@ class Diffusion(object):
         self.args = args
         self.config = config
         if device is None:
-            device = (
-                torch.device("cuda")
-                if torch.cuda.is_available()
-                else torch.device("cpu")
-            )
+            device = torch.device("cuda")
         self.device = device
 
         self.model_var_type = config.model.var_type
