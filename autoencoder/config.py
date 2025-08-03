@@ -12,7 +12,7 @@ from autoencoder.arch import *
 
 # Dataset hyperparameters.
 CLIP_LEN = 4
-BATCH_SIZE = 6
+BATCH_SIZE = 2
 NUM_WORKERS = 8
 PERSISTENT_WORKERS = True
 PIN_MEMORY = True
