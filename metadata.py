@@ -25,5 +25,5 @@ PATH_MODELS = os.path.join(ROOT, "models")
 PATH_CHECK = os.path.join(PATH_MODELS, "checkpoints")
 
 # Script paths.
-PATH_AUTOENC = os.path.join(ROOT, "autoencoder")
-PATH_DIFF = os.path.join(ROOT, "diffusion")
+PATH_UNET3D = os.path.join(ROOT, "unet3d")
+PATH_FASTDVDNET = os.path.join(ROOT, "fastdvdnet")

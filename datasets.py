@@ -7,10 +7,8 @@ import torch
 from torch.utils.data import Dataset
 import torchvision.transforms as T
 
-import metadata as md
 
-
-class PVDDTrainDataset(Dataset):
+class Train3DDataset(Dataset):
     """
     Dataset PVDD que toma 30//clip_len clips NO solapados de longitud clip_len
     por cada bloque de 30 frames, cargando bajo demanda.
@@ -86,7 +84,7 @@ class PVDDTrainDataset(Dataset):
         clean = torch.stack(clean_imgs, dim=1)
         return noisy, clean
 
-class PVDDTestDataset(Dataset):
+class Test3DDataset(Dataset):
     """
     Test dataset PVDD synNoiseData: 
     - agrupa secuencias de 5 frames (índices 0..4) con sufijo _[SML]
@@ -158,3 +156,123 @@ class PVDDTestDataset(Dataset):
         noisy = torch.stack(noisy, dim=1)  # (C, clip_len, H, W)
         clean = torch.stack(clean, dim=1)
         return noisy, clean
+
+
+class Train2DDataset(Dataset):
+    """
+    Dataset para entrenar FastDVDnet de forma 2D (sin noise_map).
+    Devuelve clips ruidosos apilados en canales y el frame limpio central.
+    """
+    def __init__(self, root_dir: str, clip_len: int = 5, transform=None):
+        super().__init__()
+        assert clip_len % 2 == 1, "clip_len debe ser impar para tener un frame central"
+        self.clip_len = clip_len
+        self.half = clip_len // 2
+        self.transform = transform or T.ToTensor()
+
+        # Obtener listas de archivos clean y noisy
+        ext = 'png'
+        clean_files = glob.glob(os.path.join(root_dir, 'clean', f'clean_*.{ext}'))
+        noisy_files = glob.glob(os.path.join(root_dir, 'noisy', f'noisy_*.{ext}'))
+
+        # Agrupar por secuencia completa de 30 frames
+        seqs = {}
+        for p in clean_files:
+            fn = os.path.basename(p)
+            _, vid, grp, idx_ext = fn.split('_')
+            idx = int(idx_ext.split('.')[0])
+            seqs.setdefault((vid, grp), {})['clean'] = seqs.get((vid, grp), {}).get('clean', []) + [(idx, p)]
+        for p in noisy_files:
+            fn = os.path.basename(p)
+            _, vid, grp, idx_ext = fn.split('_')
+            idx = int(idx_ext.split('.')[0])
+            seqs.setdefault((vid, grp), {})['noisy'] = seqs.get((vid, grp), {}).get('noisy', []) + [(idx, p)]
+
+        # Filtrar secuencias completas de 30 frames y generar offsets no solapados
+        self.samples = []
+        offsets = list(range(0, 30 - clip_len + 1, clip_len))
+        for key, data in seqs.items():
+            clean_list = sorted(data.get('clean', []), key=lambda x: x[0])
+            noisy_list = sorted(data.get('noisy', []), key=lambda x: x[0])
+            if len(clean_list) == 30 and len(noisy_list) == 30:
+                clean_paths = [p for _, p in clean_list]
+                noisy_paths = [p for _, p in noisy_list]
+                for off in offsets:
+                    clip_noisy = noisy_paths[off:off + clip_len]
+                    clip_clean = clean_paths[off:off + clip_len]
+                    self.samples.append((clip_noisy, clip_clean))
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        noisy_paths, clean_paths = self.samples[idx]
+        # Cargar y transformar
+        noisy_imgs = [self.transform(Image.open(p).convert('RGB')) for p in noisy_paths]
+        clean_imgs = [self.transform(Image.open(p).convert('RGB')) for p in clean_paths]
+
+        # Apilar como (C, T, H, W)
+        noisy = torch.stack(noisy_imgs, dim=1)
+        clean = torch.stack(clean_imgs, dim=1)
+
+        # Aplanar clips ruidosos: (C*T, H, W)
+        C, T, H, W = noisy.shape
+        noisy = noisy.view(C * T, H, W)
+
+        # Frame central limpio: (C, H, W)
+        central = clean[:, self.half, :, :]
+        return noisy, central
+
+
+class Test2DDataset(Dataset):
+    """
+    Dataset de prueba para FastDVDnet de forma 2D.
+    Desliza ventana de tamaño clip_len sobre secuencias de 5 frames.
+    """
+    def __init__(self, root_dir: str, level: str, clip_len: int = 5, transform=None):
+        super().__init__()
+        assert level in ('S', 'M', 'L'), "level debe ser 'S', 'M' o 'L'"
+        assert clip_len % 2 == 1, "clip_len debe ser impar"
+        self.clip_len = clip_len
+        self.half = clip_len // 2
+        self.transform = transform or T.ToTensor()
+
+        noisy_dir = os.path.join(root_dir, 'noisy')
+        clean_dir = os.path.join(root_dir, 'clean')
+        pat = re.compile(r'^noisy_(T\d+)_(frame\d+)_(\d+)_([SML])\.png$')
+
+        seqs = {}
+        for fn in sorted(os.listdir(noisy_dir)):
+            m = pat.match(fn)
+            if m and m.group(4) == level:
+                vid, grp, idx_str, _ = m.groups()
+                idx = int(idx_str)
+                seqs.setdefault((vid, grp), []).append((idx, fn))
+
+        self.samples = []
+        for key, frames in seqs.items():
+            if len(frames) != 5:
+                continue
+            frames = sorted(frames, key=lambda x: x[0])
+            noisy_paths = [os.path.join(noisy_dir, fn) for _, fn in frames]
+            clean_paths = [os.path.join(clean_dir, fn.replace('noisy_', 'clean_')) for _, fn in frames]
+            for off in range(5 - clip_len + 1):
+                clip_noisy = noisy_paths[off:off + clip_len]
+                clip_clean = clean_paths[off:off + clip_len]
+                self.samples.append((clip_noisy, clip_clean))
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        noisy_paths, clean_paths = self.samples[idx]
+        noisy_imgs = [self.transform(Image.open(p).convert('RGB')) for p in noisy_paths]
+        clean_imgs = [self.transform(Image.open(p).convert('RGB')) for p in clean_paths]
+
+        noisy = torch.stack(noisy_imgs, dim=1)
+        clean = torch.stack(clean_imgs, dim=1)
+
+        C, T, H, W = noisy.shape
+        noisy = noisy.view(C * T, H, W)
+        central = clean[:, self.half, :, :]
+        return noisy, central
