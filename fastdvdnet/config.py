@@ -27,3 +27,7 @@ LR = 1e-3
 LAST_EPOCH = 0
 OPTIMIZER = optim.AdamW
 SCHEDULER = True
+
+# Test hyperparameters.
+NAME_TEST = "fastdvdnet10"
+

@@ -30,7 +30,7 @@ if __name__ == "__main__":
     # Create model.
     model = conf.MODEL(conf.BASE_CHANNELS).to(md.DEVICE)
 
-    # Train U-Net 3D.
+    # Train FastDVDNet.
     train(
         model,
         train_loader,
