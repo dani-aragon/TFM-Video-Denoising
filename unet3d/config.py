@@ -17,13 +17,24 @@ PERSISTENT_WORKERS = True
 PIN_MEMORY = True
 
 # Model hyperparameters.
-MODEL = UNet3D
+MODEL = UNet3D_Res
 BASE_CHANNELS = 16
 
 # Train hyperparameters.
-NAME_TRAIN = "unet16"
-NUM_EPOCHS = 8
-LR = 1e-4
+NAME_TRAIN = "unetres16"
+NUM_EPOCHS = 20
+LR = 1e-3
 LAST_EPOCH = 0
 OPTIMIZER = optim.AdamW
-SCHEDULER = False
+SCHEDULER = True
+
+# Test hyperparameters.
+NAME_TEST = "unetres16"
+
+# Inference hyperparameters.
+NAME_INF = "unetrest16"
+FILES = [
+    #"4635084-hd_1920_1080_30fps.mp4",
+    #"20250816_210226.mp4",
+    "20250821_005503.mp4",
+]

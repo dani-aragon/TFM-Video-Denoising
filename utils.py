@@ -105,7 +105,7 @@ def train(
             optimizer.step()
 
             bs = noisy.size(0)
-            running_loss  += loss.item() * bs
+            running_loss += loss.item() * bs
             total_samples += bs
             avg_loss = running_loss / total_samples
 

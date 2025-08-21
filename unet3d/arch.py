@@ -85,19 +85,19 @@ class UNet3D(nn.Module):
         return out
 
 
-class UNet3D_3(nn.Module):
+class UNet3D_Res(nn.Module): # aditive skip connections
     def __init__(self, base_channels: int =16):
         """
         U-Net 3D with two pooling layers. First spatial dimension is time.
-        
+
         Args:
             base_channels (int): number of kernels in the first convolutional
                 layer (n_in). The number of kernels in the following layers
                 will be base_channels*2, base_channels*4, base_channels*2 and
                 base_channels.
         """
-        super(UNet3D, self).__init__()
-        
+        super(UNet3D_Res, self).__init__()
+
         # Double 3D-convolutional block.
         def conv_block(in_ch: int, out_ch: int) -> nn.Module:
             return nn.Sequential(
@@ -112,39 +112,36 @@ class UNet3D_3(nn.Module):
                 nn.BatchNorm3d(out_ch),
                 nn.ReLU(inplace=True),
             )
-        
+
         # Encoder.
         self.enc1 = conv_block(3, base_channels)
         self.pool1 = nn.MaxPool3d(kernel_size=2, stride=2)
         self.enc2 = conv_block(base_channels, base_channels*2)
         self.pool2 = nn.MaxPool3d(kernel_size=2, stride=2)
-        self.enc3 = conv_block(base_channels, base_channels*4)
-        self.pool3 = nn.MaxPool3d(kernel_size=2, stride=2)
-        
+
         # Bottleneck.
-        self.bottleneck = conv_block(base_channels*4, base_channels*8)
-        
+        self.bottleneck = conv_block(base_channels*2, base_channels*4)
+
         # Decoder.
-        self.up3 = nn.ConvTranspose3d(
-            base_channels*8, base_channels*4, kernel_size=2, stride=2
-        )
-        self.dec3 = conv_block(base_channels*8, base_channels*4)
         self.up2 = nn.ConvTranspose3d(
             base_channels*4, base_channels*2, kernel_size=2, stride=2
         )
-        self.dec2 = conv_block(base_channels*4, base_channels*2)
+        # CHANGED: for additive skip we sum features (both have base_channels*2), so dec2 input is base_channels*2 (not *4)
+        self.dec2 = conv_block(base_channels*2, base_channels*2)  # CHANGED
+
         self.up1 = nn.ConvTranspose3d(
             base_channels*2, base_channels, kernel_size=2, stride=2
         )
-        self.dec1 = conv_block(base_channels*2, base_channels)
-        
+        # CHANGED: for additive skip we sum features (both have base_channels), so dec1 input is base_channels (not *2)
+        self.dec1 = conv_block(base_channels, base_channels)  # CHANGED
+
         # Last layer: to 3 channels (RGB).
         self.final = nn.Conv3d(base_channels, 3, kernel_size=1)
-    
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Forward pass.
-        
+
         Input:
             x (torch.Tensor): tensor with shape (B, C=3, T, H, W).
         Output:
@@ -153,29 +150,26 @@ class UNet3D_3(nn.Module):
         # Encoder.
         e1 = self.enc1(x) # -> (B, base, T, H, W)
         p1 = self.pool1(e1) # -> (B, base, T/2, H/2, W/2)
-        
+
         e2 = self.enc2(p1) # -> (B, base*2, T/2, H/2, W/2)
         p2 = self.pool2(e2) # -> (B, base*2, T/4, H/4, W/4)
-        
-        e3 = self.enc2(p2) # -> (B, base*4, T/4, H/4, W/4)
-        p3 = self.pool2(e3) # -> (B, base*4, T/8, H/8, W/8)
-        
-        # Bottleneck.
-        b = self.bottleneck(p3) # -> (B, base*8, T/8, H/8, W/8)
-        
-        # Decoder.
-        u3 = self.up2(b) # -> (B, base*4, T/4, H/4, W/4)
-        c3 = torch.cat([u3, e3], dim=1) # skip connection
-        d3 = self.dec2(c3) # -> (B, base*4, T/4, H/4, W/4)
 
-        u2 = self.up2(d3) # -> (B, base*2, T/2, H/2, W/2)
-        c2 = torch.cat([u2, e2], dim=1) # skip connection
+        # Bottleneck.
+        b = self.bottleneck(p2) # -> (B, base*4, T/4, H/4, W/4)
+
+        # Decoder.
+        u2 = self.up2(b) # -> (B, base*2, T/2, H/2, W/2)
+        # CHANGED: additive skip connection instead of concatenation
+        c2 = u2 + e2  # CHANGED: element-wise sum (both tensors have shape (B, base*2, ...))
         d2 = self.dec2(c2) # -> (B, base*2, T/2, H/2, W/2)
-        
+
         u1 = self.up1(d2) # -> (B, base, T, H, W)
-        c1 = torch.cat([u1, e1], dim=1) # skip connection
+        # CHANGED: additive skip connection instead of concatenation
+        c1 = u1 + e1  # CHANGED: element-wise sum (both tensors have shape (B, base, ...))
         d1 = self.dec1(c1) # -> (B, base, T, H, W)
-        
+
         # Output.
         out = self.final(d1) # -> (B, 3, T, H, W)
-        return out
+
+        # Residual learning.
+        return x - out
