@@ -18,10 +18,10 @@ PIN_MEMORY = True
 
 # Model hyperparameters.
 MODEL = FastDVDNet
-BASE_CHANNELS = 16
+BASE_CHANNELS = 10
 
 # Train hyperparameters.
-NAME_TRAIN = "fastdvdnet16"
+NAME_TRAIN = "fastdvdnet10"
 NUM_EPOCHS = 20
 LR = 1e-3
 LAST_EPOCH = 0
@@ -29,4 +29,5 @@ OPTIMIZER = optim.AdamW
 SCHEDULER = True
 
 # Test hyperparameters.
-NAME_TEST = "fastdvdnet16"
+VAL = False
+NAME_TEST = "fastdvdnet10"

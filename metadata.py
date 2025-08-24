@@ -15,6 +15,7 @@ DEVICE = torch.device("cuda")
 # Data paths.
 PATH_DATA = os.path.join(ROOT, "PVDD")
 PATH_TRAIN = os.path.join(PATH_DATA, "train")
+PATH_VAL = os.path.join(PATH_DATA, "val")
 PATH_TEST = os.path.join(PATH_DATA, "test")
 PATH_EVAL = os.path.join(ROOT, "eval")
 PATH_TO_INFER = os.path.join(ROOT, "to_infer")

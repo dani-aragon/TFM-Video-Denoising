@@ -74,33 +74,39 @@ def evaluate_fastdvdnet(model, dataloader, device, output_dir):
 
 
 if __name__ == "__main__":
+    # Distinguish between validation and test.
+    if conf.VAL:
+        data_path = md.PATH_VAL
+        prefix = "val_"
+        print("Validation.")
+    else:
+        data_path = md.PATH_TEST
+        prefix = "test_"
+        print("Test.")
+    
     # Create datasets.
     datasets = {
-        "S": Test2DDataset(md.PATH_TEST, "S"),
-        "M": Test2DDataset(md.PATH_TEST, "M"),
-        "L": Test2DDataset(md.PATH_TEST, "L")
+        "S": Test2DDataset(data_path, "S"),
+        "M": Test2DDataset(data_path, "M"),
+        "L": Test2DDataset(data_path, "L")
     }
     print(f"Total clips in S: {len(datasets["S"])}.")
-    print(f"Total clips in M: {len(datasets["S"])}.")
-    print(f"Total clips in L: {len(datasets["S"])}.")
+    print(f"Total clips in M: {len(datasets["M"])}.")
+    print(f"Total clips in L: {len(datasets["L"])}.")
 
-    for i in range(20, 4, -1):
+    for i in range(15, 14, -1):
         # Create model eval folder.
         model_name = f"check_{i}_{conf.NAME_TEST}"
         print(f"Evaluating {model_name}.")
-        model_path = os.path.join(md.PATH_EVAL, model_name)
+        model_path = os.path.join(md.PATH_EVAL, prefix + model_name)
         os.makedirs(model_path, exist_ok=True)
 
         # Create and load model.
         model = conf.MODEL(conf.BASE_CHANNELS).to(md.DEVICE)
         ckpt = torch.load(
-            os.path.join(
-                md.PATH_CHECK,
-                model_name + ".pth"
-            ),
+            os.path.join(md.PATH_CHECK, model_name + ".pth"),
             map_location=md.DEVICE
         )
-        # Carga solo el dict del modelo
         model.load_state_dict(ckpt["model_state"])
 
         # Iterate over noise levels.

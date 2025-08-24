@@ -15,6 +15,7 @@ import metadata as md
 import config as conf
 from datasets import Test3DDataset
 
+
 def evaluate_unet3d(model, dataloader, device, output_dir, model_input_order="bcthw"):
     """
     Evalúa una UNet3D usando el protocolo explicado arriba.
@@ -134,20 +135,31 @@ def evaluate_unet3d(model, dataloader, device, output_dir, model_input_order="bc
 
 
 if __name__ == "__main__":
-    # Create datasets. Aquí clip_len=5 para obtener las ventanas completas de 5 frames por sample.
+
+    # Distinguish between validation and test.
+    if conf.VAL:
+        data_path = md.PATH_VAL
+        prefix = "val_"
+        print("Validation.")
+    else:
+        data_path = md.PATH_TEST
+        prefix = "test_"
+        print("Test.")
+    
+    # Create datasets.
     datasets = {
-        "S": Test3DDataset(md.PATH_TEST, "S", clip_len=5),
-        "M": Test3DDataset(md.PATH_TEST, "M", clip_len=5),
-        "L": Test3DDataset(md.PATH_TEST, "L", clip_len=5)
+        "S": Test3DDataset(data_path, "S", clip_len=5),
+        "M": Test3DDataset(data_path, "M", clip_len=5),
+        "L": Test3DDataset(data_path, "L", clip_len=5)
     }
     print(f"Total clips in S: {len(datasets['S'])}.")
     print(f"Total clips in M: {len(datasets['M'])}.")
     print(f"Total clips in L: {len(datasets['L'])}.")
 
-    for i in range(20, 4, -1):
+    for i in range(20, 19, -1):
         model_name = f"check_{i}_{conf.NAME_TEST}"
         print(f"\nEvaluating {model_name}.")
-        model_path = os.path.join(md.PATH_EVAL, model_name)
+        model_path = os.path.join(md.PATH_EVAL, prefix + model_name)
         os.makedirs(model_path, exist_ok=True)
 
         # Create and load model.

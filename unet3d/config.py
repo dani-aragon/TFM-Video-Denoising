@@ -29,6 +29,7 @@ OPTIMIZER = optim.AdamW
 SCHEDULER = True
 
 # Test hyperparameters.
+VAL = False
 NAME_TEST = "unetres16"
 
 # Inference hyperparameters.
