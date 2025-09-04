@@ -1,3 +1,7 @@
+"""
+Script that contains important metadata.
+"""
+
 import os
 
 import torch

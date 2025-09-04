@@ -1,7 +1,13 @@
+"""
+Script that contains all the classes related to the 3D denoising UNet3D
+models.
+"""
+
 import torch
 import torch.nn as nn
 
 
+# Architecture whose skip connections concatenate.
 class UNet3D(nn.Module):
     def __init__(self, base_channels: int =16):
         """
@@ -85,7 +91,8 @@ class UNet3D(nn.Module):
         return out
 
 
-class UNet3D_Res(nn.Module): # aditive skip connections
+# Architecture with global residual learning and aditive skip connections.
+class UNet3D_Res(nn.Module):
     def __init__(self, base_channels: int =16):
         """
         U-Net 3D with two pooling layers. First spatial dimension is time.
@@ -126,14 +133,11 @@ class UNet3D_Res(nn.Module): # aditive skip connections
         self.up2 = nn.ConvTranspose3d(
             base_channels*4, base_channels*2, kernel_size=2, stride=2
         )
-        # CHANGED: for additive skip we sum features (both have base_channels*2), so dec2 input is base_channels*2 (not *4)
-        self.dec2 = conv_block(base_channels*2, base_channels*2)  # CHANGED
-
+        self.dec2 = conv_block(base_channels*2, base_channels*2)
         self.up1 = nn.ConvTranspose3d(
             base_channels*2, base_channels, kernel_size=2, stride=2
         )
-        # CHANGED: for additive skip we sum features (both have base_channels), so dec1 input is base_channels (not *2)
-        self.dec1 = conv_block(base_channels, base_channels)  # CHANGED
+        self.dec1 = conv_block(base_channels, base_channels)
 
         # Last layer: to 3 channels (RGB).
         self.final = nn.Conv3d(base_channels, 3, kernel_size=1)
@@ -159,13 +163,11 @@ class UNet3D_Res(nn.Module): # aditive skip connections
 
         # Decoder.
         u2 = self.up2(b) # -> (B, base*2, T/2, H/2, W/2)
-        # CHANGED: additive skip connection instead of concatenation
-        c2 = u2 + e2  # CHANGED: element-wise sum (both tensors have shape (B, base*2, ...))
+        c2 = u2 + e2 # -> (B, base*2, T/2, H/2, W/2)
         d2 = self.dec2(c2) # -> (B, base*2, T/2, H/2, W/2)
 
         u1 = self.up1(d2) # -> (B, base, T, H, W)
-        # CHANGED: additive skip connection instead of concatenation
-        c1 = u1 + e1  # CHANGED: element-wise sum (both tensors have shape (B, base, ...))
+        c1 = u1 + e1 # -> (B, base, T, H, W)
         d1 = self.dec1(c1) # -> (B, base, T, H, W)
 
         # Output.

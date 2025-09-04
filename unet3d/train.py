@@ -1,3 +1,8 @@
+"""
+Script to train the 2D denoising FastDVDNet models. Tune hyperparameters in
+the corresponding config.py.
+"""
+
 import os, sys
 
 from torch.utils.data import DataLoader

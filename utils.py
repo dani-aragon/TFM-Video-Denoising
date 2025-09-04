@@ -1,3 +1,7 @@
+"""
+Script which contains the training function used to train both architectures.
+"""
+
 import os
 
 import torch
@@ -25,19 +29,24 @@ def train(
     save_path: str =md.PATH_CHECK,
     device: device =md.DEVICE
 ) -> None:
-    """_summary_
+    """Function to train a video denoising model in PVDD.
 
     Args:
-        model (nn.Module): _description_
-        loader (DataLoader): _description_
-        name (str): _description_
-        num_epochs (int): _description_
-        lr (float): _description_
-        last_epoch (int): _description_
-        optimizer (Optimizer): _description_
-        use_scheduler (bool): _description_
-        save_path (str, optional): _description_. Defaults to md.PATH_CHECK.
-        device (device, optional): _description_. Defaults to md.DEVICE.
+        model (nn.Module): arquitecture of the model to train.
+        loader (DataLoader): data loader created for PVDD data.
+        name (str): name used to save the model checkpoints.
+        num_epochs (int): number of total training epochs.
+        lr (float): (initial) learning rate of the optimization process.
+        last_epoch (int): number of the previous training epoch to the first
+            one of this training. Set to 0 if the training is not being
+            resumed.
+        optimizer (Optimizer): torch optimizer which will be used.
+        use_scheduler (bool): set to True if you want to use a CosineAnnealing
+            learning rate scheduler, False otherwise.
+        save_path (str, optional): path in which the checkpoints will be
+            saved. Defaults to md.PATH_CHECK.
+        device (device, optional): device to use during the training.
+            Defaults to md.DEVICE.
     """
     print(f"Training {name}.")
 

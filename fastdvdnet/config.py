@@ -1,3 +1,8 @@
+"""
+Configuration script for the 2D denoising FastDVDNet models. Change the
+hyperparameters here before running training or evaluation.
+"""
+
 import os, sys
 
 import torch.optim as optim
@@ -28,6 +33,7 @@ LAST_EPOCH = 0
 OPTIMIZER = optim.AdamW
 SCHEDULER = True
 
-# Test hyperparameters.
+# Evaluation hyperparameters.
 VAL = False
+CKPT_RANGE = range(15, 14, -1)
 NAME_TEST = "fastdvdnet10"

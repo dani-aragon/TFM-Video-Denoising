@@ -1,3 +1,8 @@
+"""
+Script with the torch dataset classes used to load PVDD data and create
+correct data structures for training and evaluating.
+"""
+
 import os
 import glob
 import re
@@ -10,8 +15,9 @@ import torchvision.transforms as T
 
 class Train3DDataset(Dataset):
     """
-    Dataset PVDD que toma 30//clip_len clips NO solapados de longitud clip_len
-    por cada bloque de 30 frames, cargando bajo demanda.
+    Dataset class to train the 3D models using PVDD which takes 30//"clip_len"
+    non-overlapping clips of length "clip_len" for each 30-frame block and
+    loads them on demand.
     """
     def __init__(
         self, root_dir: str, clip_len: int, transform=None
@@ -19,7 +25,7 @@ class Train3DDataset(Dataset):
         self.clip_len  = clip_len
         self.transform = transform or T.ToTensor()
 
-        # 1) recoge todos los paths clean/noisy
+        # Collect all clean/noisy pairs' paths.
         ext = "png"
         clean_files = glob.glob(
             os.path.join(root_dir, 'clean', f'clean_*.{ext}')
@@ -28,7 +34,7 @@ class Train3DDataset(Dataset):
             os.path.join(root_dir, 'noisy', f'noisy_*.{ext}')
         )
 
-        # 2) agrupa por (video, frame_group)
+        # Group by video and frame_group.
         seqs = {}
         for p in clean_files:
             fn = os.path.basename(p)
@@ -45,7 +51,7 @@ class Train3DDataset(Dataset):
             if key in seqs:
                 seqs[key]['noisy'].append((idx,p))
 
-        # 3) filtra y ordena secuencias válidas de 30 frames
+        # Filter and sort all 30-frame valid sequences.
         self.samples = []
         for key, d in seqs.items():
             clean_list = sorted(d['clean'], key=lambda x: x[0])
@@ -54,15 +60,16 @@ class Train3DDataset(Dataset):
                 clean_paths = [p for _,p in clean_list]
                 noisy_paths = [p for _,p in noisy_list]
                 self.samples.append((noisy_paths, clean_paths))
-        assert self.samples, "No hay secuencias de 30 frames válidas"
+        assert self.samples, "There are no valid 30-frame sequences."
 
-        # 4) offsets NO solapados
+        # Non-overlapping offsets.
         self.offsets = list(range(0, 30 - clip_len + 1, clip_len))
 
     def __len__(self):
-        # cada secuencia aporta len(self.offsets) clips
         return len(self.samples) * len(self.offsets)
 
+    # Edited __getitem__ method in order to load frames on demand instead of
+    # loading all of them in memory, which is impossible.
     def __getitem__(self, idx):
         clips_per_seq = len(self.offsets)
         seq_idx    = idx // clips_per_seq
@@ -71,25 +78,23 @@ class Train3DDataset(Dataset):
 
         noisy_paths, clean_paths = self.samples[seq_idx]
 
-        # selecciona clip de longitud clip_len
+        # Select clip.
         noisy_clip = noisy_paths[off: off + self.clip_len]
         clean_clip = clean_paths[off: off + self.clip_len]
 
-        # carga bajo demanda y transforma
+        # Load on demand, transform and stack.
         noisy_imgs = [self.transform(Image.open(p)) for p in noisy_clip]
         clean_imgs = [self.transform(Image.open(p)) for p in clean_clip]
-
-        # apila en (C, T, H, W)
         noisy = torch.stack(noisy_imgs, dim=1)
         clean = torch.stack(clean_imgs, dim=1)
+
         return noisy, clean
 
 class Test3DDataset(Dataset):
     """
-    Test dataset PVDD synNoiseData: 
-    - agrupa secuencias de 5 frames (índices 0..4) con sufijo _[SML]
-    - genera clips deslizando ventana de tamaño clip_len (p.ej. 4)
-    - empareja noisy_<base>_[SML].png <-> clean_<base>_[SML].png
+    Dataset class to test the 3D models using PVDD's synthetic noise data,
+    which takes all possible sequences with "clip_len" <=5 length given a
+    noise level and loads them on demand.
     """
     def __init__(
         self, root_dir, level, clip_len, transform=None
@@ -102,7 +107,7 @@ class Test3DDataset(Dataset):
         clean_dir = os.path.join(root_dir, 'clean')
         pat = re.compile(r'^noisy_(T\d+)_(frame\d+)_(\d+)_([SML])\.png$')
 
-        # Paso 1: agrupa por (vid, frameGroup, level)
+        # Group by sequence, frame group and level.
         seqs = {}
         for fn in sorted(os.listdir(noisy_dir)):
             m = pat.match(fn)
@@ -115,36 +120,40 @@ class Test3DDataset(Dataset):
             key = (vid, grp, lvl)
             seqs.setdefault(key, []).append((idx, fn))
 
-        # Paso 2: para cada secuencia válida de 4 frames, crea clips
+        # For each valid sequence of "clip_len" length, create a clip.
         self.clips = []
         for (vid, grp, lvl), frames in seqs.items():
             if len(frames) != 5:
                 continue
-            # ordena por idx 0..4
             frames = sorted(frames, key=lambda x: x[0])
             noisy_paths = [os.path.join(noisy_dir, fn) for _, fn in frames]
             clean_paths = [
                 os.path.join(clean_dir, fn.replace('noisy_','clean_'))
                 for _, fn in frames
             ]
-            # verifica existencia
+            # Verify existence.
             for p in clean_paths:
                 if not os.path.isfile(p):
                     raise FileNotFoundError(
-                        f"No existe el archivo clean: {p}"
+                        f"Clean file: {p} does not exist."
                     )
-            # sliding window
+            # Slide window.
             for off in range(5 - clip_len + 1):
-                self.clips.append((
-                    noisy_paths[off:off+clip_len],
-                    clean_paths[off:off+clip_len]
-                ))
+                self.clips.append(
+                    (
+                        noisy_paths[off:off+clip_len],
+                        clean_paths[off:off+clip_len]
+                    )
+                )
 
-        assert self.clips, "No se han encontrado secuencias/clips válidos"
+        # Check if there are any valid clips.
+        assert self.clips, "No valid clips found."
 
     def __len__(self):
         return len(self.clips)
 
+    # Edited __getitem__ method in order to load frames on demand instead of
+    # loading all of them in memory, which is impossible.
     def __getitem__(self, idx):
         noisy_paths, clean_paths = self.clips[idx]
         noisy = [
@@ -160,35 +169,44 @@ class Test3DDataset(Dataset):
 
 class Train2DDataset(Dataset):
     """
-    Dataset para entrenar FastDVDnet de forma 2D (sin noise_map).
-    Devuelve clips ruidosos apilados en canales y el frame limpio central.
+    Dataset class to train the 2D models using PVDD which takes 30//"clip_len"
+    non-overlapping noisy clips of length "clip_len" (it has to be odd) and
+    its central clean frame for each 30-frame block and loads them on demand.
     """
     def __init__(self, root_dir: str, clip_len: int = 5, transform=None):
         super().__init__()
-        assert clip_len % 2 == 1, "clip_len debe ser impar para tener un frame central"
+        assert clip_len % 2 == 1, "clip_len must be odd."
         self.clip_len = clip_len
         self.half = clip_len // 2
         self.transform = transform or T.ToTensor()
 
-        # Obtener listas de archivos clean y noisy
+        # Get clean and noisy file lists.
         ext = 'png'
-        clean_files = glob.glob(os.path.join(root_dir, 'clean', f'clean_*.{ext}'))
-        noisy_files = glob.glob(os.path.join(root_dir, 'noisy', f'noisy_*.{ext}'))
+        clean_files = glob.glob(
+            os.path.join(root_dir, 'clean', f'clean_*.{ext}')
+        )
+        noisy_files = glob.glob(
+            os.path.join(root_dir, 'noisy', f'noisy_*.{ext}')
+        )
 
-        # Agrupar por secuencia completa de 30 frames
+        # Group by 30-frame sequences.
         seqs = {}
         for p in clean_files:
             fn = os.path.basename(p)
             _, vid, grp, idx_ext = fn.split('_')
             idx = int(idx_ext.split('.')[0])
-            seqs.setdefault((vid, grp), {})['clean'] = seqs.get((vid, grp), {}).get('clean', []) + [(idx, p)]
+            seqs.setdefault((vid, grp), {})['clean'] = seqs.get(
+                (vid, grp), {}
+            ).get('clean', []) + [(idx, p)]
         for p in noisy_files:
             fn = os.path.basename(p)
             _, vid, grp, idx_ext = fn.split('_')
             idx = int(idx_ext.split('.')[0])
-            seqs.setdefault((vid, grp), {})['noisy'] = seqs.get((vid, grp), {}).get('noisy', []) + [(idx, p)]
+            seqs.setdefault((vid, grp), {})['noisy'] = seqs.get(
+                (vid, grp), {}
+            ).get('noisy', []) + [(idx, p)]
 
-        # Filtrar secuencias completas de 30 frames y generar offsets no solapados
+        # Filter 30-frame sequences and generate non-overlapping offsets.
         self.samples = []
         offsets = list(range(0, 30 - clip_len + 1, clip_len))
         for key, data in seqs.items():
@@ -205,34 +223,38 @@ class Train2DDataset(Dataset):
     def __len__(self):
         return len(self.samples)
 
+    # Edited __getitem__ method in order to load frames on demand instead of
+    # loading all of them in memory, which is impossible.
     def __getitem__(self, idx):
         noisy_paths, clean_paths = self.samples[idx]
-        # Cargar y transformar
+        # Load and transform.
         noisy_imgs = [self.transform(Image.open(p).convert('RGB')) for p in noisy_paths]
         clean_imgs = [self.transform(Image.open(p).convert('RGB')) for p in clean_paths]
 
-        # Apilar como (C, T, H, W)
+        # Stack as (C, T, H, W).
         noisy = torch.stack(noisy_imgs, dim=1)
         clean = torch.stack(clean_imgs, dim=1)
 
-        # Aplanar clips ruidosos: (C*T, H, W)
+        # Reshape noisy clips: (C*T, H, W).
         C, T, H, W = noisy.shape
         noisy = noisy.view(C * T, H, W)
 
-        # Frame central limpio: (C, H, W)
+        # Central clean frame: (C, H, W).
         central = clean[:, self.half, :, :]
+
         return noisy, central
 
 
 class Test2DDataset(Dataset):
     """
-    Dataset de prueba para FastDVDnet de forma 2D.
-    Desliza ventana de tamaño clip_len sobre secuencias de 5 frames.
+    Dataset class to test the 2D models using PVDD's synthetic noise data,
+    which takes all possible sequences with "clip_len" <=5 length given a
+    noise level and loads them on demand.
     """
     def __init__(self, root_dir: str, level: str, clip_len: int = 5, transform=None):
         super().__init__()
-        assert level in ('S', 'M', 'L'), "level debe ser 'S', 'M' o 'L'"
-        assert clip_len % 2 == 1, "clip_len debe ser impar"
+        assert level in ('S', 'M', 'L'), "level must be 'S', 'M' o 'L'."
+        assert clip_len % 2 == 1, "clip_len must be odd."
         self.clip_len = clip_len
         self.half = clip_len // 2
         self.transform = transform or T.ToTensor()
@@ -264,6 +286,8 @@ class Test2DDataset(Dataset):
     def __len__(self):
         return len(self.samples)
 
+    # Edited __getitem__ method in order to load frames on demand instead of
+    # loading all of them in memory, which is impossible.
     def __getitem__(self, idx):
         noisy_paths, clean_paths = self.samples[idx]
         noisy_imgs = [self.transform(Image.open(p).convert('RGB')) for p in noisy_paths]

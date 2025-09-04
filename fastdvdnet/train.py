@@ -1,3 +1,8 @@
+"""
+Script to train the 3D denoising UNet3D models. Tune hyperparameters in the
+corresponding config.py.
+"""
+
 import os, sys
 
 from torch.utils.data import DataLoader

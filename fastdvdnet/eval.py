@@ -1,3 +1,9 @@
+"""
+Script to evaluate the 2D denoising FastDVDNet models via validation and test.
+Edit config.py file to set the script to validation or test mode and choose
+the model and checkpoints to check.
+"""
+
 import os, sys
 
 import torch
@@ -17,9 +23,11 @@ from datasets import Test2DDataset
 
 
 def evaluate_fastdvdnet(model, dataloader, device, output_dir):
-    """
-    Inferencia + métricas con tqdm.
-    Guarda en disk el frame denoised de cada clip y retorna (psnr_avg, ssim_avg).
+    """Inference and metrics of the given data loader for the 2D model
+    "model". For each 5-frame noisy clip, the model returns the denoised
+    central frame, which is saved on "output_dir" and compared through PSNR
+    and SSIM metrics to the clean central frame. The function returns the
+    average PSNR and SSIM across all the central frames of the dataloader.
     """
     os.makedirs(output_dir, exist_ok=True)
     model.to(device).eval()
@@ -29,33 +37,37 @@ def evaluate_fastdvdnet(model, dataloader, device, output_dir):
     count = 0
 
     with torch.no_grad():
-        for batch_idx, (noisy, clean) in enumerate(tqdm(dataloader, desc="Evaluating clips")):
+        for batch_idx, (noisy, clean) in enumerate(
+            tqdm(dataloader, desc="Evaluating clips")
+        ):
             # noisy: [B, C*T, H, W], clean: [B, C, H, W]
             noisy = noisy.to(device)
             clean = clean.to(device)
 
-            # Forward
-            denoised = model(noisy)        # [B, C, H, W]
+            # Forward.
+            denoised = model(noisy) # [B, C, H, W]
 
-            # Llevar a CPU para salvar y métricas
+            # Move to CPU to save and compute metrics.
             deno_cpu  = denoised.cpu()
             clean_cpu = clean.cpu()
 
             B = deno_cpu.size(0)
             for b in range(B):
-                out_img = deno_cpu[b]       # [C, H, W]
-                gt_img  = clean_cpu[b]      # [C, H, W]
+                out_img = deno_cpu[b] # [C, H, W]
+                gt_img  = clean_cpu[b] # [C, H, W]
 
-                # 1) Guarda imagen
+                # Save image.
                 pil = to_pil_image(out_img.clamp(0,1))
-                filename = os.path.join(output_dir, f"denoised_{batch_idx:04d}_{b:03d}.png")
+                filename = os.path.join(
+                    output_dir, f"denoised_{batch_idx:04d}_{b:03d}.png"
+                )
                 pil.save(filename)
 
-                # 2) Convierte a numpy H×W×C en [0,1]
+                # Convert to numpy H×W×C en [0,1].
                 out_np = out_img.numpy().transpose(1,2,0)
                 gt_np  = gt_img.numpy().transpose(1,2,0)
 
-                # 3) Calcula PSNR y SSIM
+                # Compute PSNR and SSIM.
                 psnr_val = psnr(gt_np, out_np, data_range=1.0)
                 ssim_val = ssim(
                     gt_np, out_np,
@@ -65,7 +77,7 @@ def evaluate_fastdvdnet(model, dataloader, device, output_dir):
 
                 psnr_sum += psnr_val
                 ssim_sum += ssim_val
-                count    += 1
+                count += 1
 
     psnr_avg = psnr_sum / count
     ssim_avg = ssim_sum / count
@@ -94,7 +106,7 @@ if __name__ == "__main__":
     print(f"Total clips in M: {len(datasets["M"])}.")
     print(f"Total clips in L: {len(datasets["L"])}.")
 
-    for i in range(15, 14, -1):
+    for i in conf.CKPT_RANGE:
         # Create model eval folder.
         model_name = f"check_{i}_{conf.NAME_TEST}"
         print(f"Evaluating {model_name}.")
@@ -127,10 +139,12 @@ if __name__ == "__main__":
                 pin_memory=conf.PIN_MEMORY
             )
 
-            current_psnr, current_ssim = evaluate_fastdvdnet(
+            cur_psnr, cur_ssim = evaluate_fastdvdnet(
                 model,
                 test_loader,
                 device=md.DEVICE,
                 output_dir=level_path
             )
-            print(f"PSNR medio: {current_psnr:.4f} dB, SSIM medio: {current_ssim:.4f}.")
+            print(
+                f"PSNR medio: {cur_psnr:.4f} dB, SSIM medio: {cur_ssim:.4f}."
+            )

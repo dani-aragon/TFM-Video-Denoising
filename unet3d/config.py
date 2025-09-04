@@ -1,3 +1,8 @@
+"""
+Configuration script for the 3D denoising UNet3D models. Change the
+hyperparameters here before running training, evaluation or inference.
+"""
+
 import os, sys
 
 import torch.optim as optim
@@ -28,12 +33,14 @@ LAST_EPOCH = 0
 OPTIMIZER = optim.AdamW
 SCHEDULER = True
 
-# Test hyperparameters.
+# Evaluation hyperparameters.
 VAL = False
+CKPT_RANGE = range(20, 19, -1)
 NAME_TEST = "unetres16"
 
 # Inference hyperparameters.
-NAME_INF = "unetrest16"
+NAME_INF = "unetres16"
+EVALUATOR = 4 # how to evaluate and produce the final clean video
 FILES = [
     #"4635084-hd_1920_1080_30fps.mp4",
     #"20250816_210226.mp4",
